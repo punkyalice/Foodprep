@@ -1,0 +1,60 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: freezer_app
+    ports:
+      - "8081:80"
+    env_file:
+      - .env
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      APP_URL: ${APP_URL:-http://localhost:8081}
+      DB_HOST: ${DB_HOST:-mysql}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-freezer_inventory}
+      DB_USER: ${DB_USER:-freezer}
+      DB_PASSWORD: ${DB_PASSWORD}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+    volumes:
+      - ./app:/var/www/html:delegated
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.4
+    container_name: freezer_mysql
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-freezer_inventory}
+      MYSQL_USER: ${DB_USER:-freezer}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_ROOT_PASSWORD: ""
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/initdb.d:/docker-entrypoint-initdb.d:ro
+      - ./docker/mysql/conf.d:/etc/mysql/conf.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: freezer_pma
+    ports:
+      - "${PMA_PORT:-8082}:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
